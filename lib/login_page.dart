@@ -58,8 +58,10 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child:
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red),
+                  ),
                 )
             ],
           ),
