@@ -1,0 +1,27 @@
+
+name: subject_category_dashboard
+description: Flutter web dashboard for managing 2학년, 3학년 과목 분류.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.17.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^2.30.0
+  cloud_firestore: ^4.14.0
+  firebase_auth: ^4.17.0
+  intl: ^0.20.2
+  http: ^1.4.0
+  shared_preferences: ^2.5.3
+  shared_preferences_web: ^2.4.3
+  shared_preferences_platform_interface: ^2.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
