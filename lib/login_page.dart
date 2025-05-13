@@ -25,6 +25,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const AdminHomePage()),
       );
+      print(FirebaseAuth.instance.currentUser?.email);
     } catch (e) {
       setState(() => _error = "로그인 실패: ${e.toString()}");
     }

@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,7 +14,7 @@ class SubjectCategoryDashboard extends StatefulWidget {
 }
 
 class _SubjectCategoryDashboardState extends State<SubjectCategoryDashboard> {
-  final List<String> categories = ["인문", "자연", "예체능", "공통"];
+  final List<String> categories = ["인문", "자연", "진로", "예체능", "공통"];
   Map<String, String?> categoryMap = {};
   Map<String, bool> isOriginalMap = {};
   List<String> grade2Subjects = [];
@@ -36,29 +37,6 @@ class _SubjectCategoryDashboardState extends State<SubjectCategoryDashboard> {
     final cacheTime = prefs.getInt(cacheTimeKey) ?? 0;
     const cacheDuration = 6 * 60 * 60 * 1000;
 
-    List<String> g2Subjects = [], g3Subjects = [];
-    Map<String, Map<String, dynamic>> firestoreData = {};
-
-    try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection("subjects").get();
-
-      for (var doc in snapshot.docs) {
-        final data = doc.data();
-        final grade = data["grade"];
-        final name = doc.id;
-        firestoreData[name] = data;
-
-        if (grade == 2) g2Subjects.add(name);
-        if (grade == 3) g3Subjects.add(name);
-
-        categoryMap[name] = data["category"];
-        isOriginalMap[name] = data["isOriginal"] ?? false;
-      }
-    } catch (e) {
-      print("Firestore fetch failed: $e");
-    }
-
     List<String> allG2 = [], allG3 = [];
 
     if (prefs.containsKey(cacheKey) && now - cacheTime < cacheDuration) {
@@ -68,18 +46,45 @@ class _SubjectCategoryDashboardState extends State<SubjectCategoryDashboard> {
     } else {
       allG2 = await TimetableDataApi.getSubjects(grade: 2);
       allG3 = await TimetableDataApi.getSubjects(grade: 3);
-
-      final cachedData = {"grade2": allG2, "grade3": allG3};
-      await prefs.setString(cacheKey, jsonEncode(cachedData));
+      await prefs.setString(cacheKey, jsonEncode({"grade2": allG2, "grade3": allG3}));
       await prefs.setInt(cacheTimeKey, now);
     }
 
-    final g2Total = {...g2Subjects, ...allG2}.toList()..sort();
-    final g3Total = {...g3Subjects, ...allG3}.toList()..sort();
+    for (String subject in allG2) {
+      final doc = await FirebaseFirestore.instance
+          .collection("subjects")
+          .doc("2")
+          .collection(subject)
+          .doc("meta")
+          .get();
+
+      final key = "2:$subject";
+      if (doc.exists) {
+        final data = doc.data()!;
+        categoryMap[key] = data["category"];
+        isOriginalMap[key] = data["isOriginal"] ?? false;
+      }
+    }
+
+    for (String subject in allG3) {
+      final doc = await FirebaseFirestore.instance
+          .collection("subjects")
+          .doc("3")
+          .collection(subject)
+          .doc("meta")
+          .get();
+
+      final key = "3:$subject";
+      if (doc.exists) {
+        final data = doc.data()!;
+        categoryMap[key] = data["category"];
+        isOriginalMap[key] = data["isOriginal"] ?? false;
+      }
+    }
 
     setState(() {
-      grade2Subjects = g2Total;
-      grade3Subjects = g3Total;
+      grade2Subjects = allG2;
+      grade3Subjects = allG3;
       loading = false;
     });
   }
@@ -95,78 +100,102 @@ class _SubjectCategoryDashboardState extends State<SubjectCategoryDashboard> {
   }
 
   Widget buildSubjectItem(String subject, int grade) {
-    String? category = categoryMap[subject];
-    bool isOriginal = isOriginalMap[subject] ?? false;
+    final key = "$grade:$subject";
+    String? category = categoryMap[key];
+    bool isOriginal = isOriginalMap[key] ?? false;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => hoveredSubject = subject),
+      onEnter: (_) => setState(() => hoveredSubject = key),
       onExit: (_) => setState(() => hoveredSubject = null),
-      child: Card(
-        color: hoveredSubject == subject ? Colors.blue.withOpacity(0.05) : null,
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: ListTile(
-          title: Row(
-            children: [
-              Text(subject),
-              const SizedBox(width: 8),
-              if (category == null)
-                const Icon(Icons.error, color: Colors.red, size: 16),
-            ],
-          ),
-          subtitle: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(children: [
-                const Text("분류: "),
-                DropdownButton<String>(
-                  value: category,
-                  hint: const Text("선택"),
-                  items: categories
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (newVal) {
-                    setState(() {
-                      categoryMap[subject] = newVal;
-                    });
-                    FirebaseFirestore.instance
-                        .collection("subjects")
-                        .doc(subject)
-                        .set({
-                      "category": newVal,
-                      "isOriginal": isOriginal,
-                      "grade": grade,
-                    }, SetOptions(merge: true));
-                  },
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        child: Card(
+          color: hoveredSubject == key ? Colors.blue.withOpacity(0.05) : null,
+          elevation: 0,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Flexible(
+                      child: Text(subject,
+                          style: const TextStyle(fontWeight: FontWeight.bold))),
+                  const SizedBox(width: 5),
+                  Text("($grade학년)",
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  if (category == null)
+                    const Icon(Icons.error, color: Colors.red, size: 16),
+                ]),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    DropdownButton<String>(
+                      value: category,
+                      hint: const Text("분류 선택"),
+                      items: categories
+                          .map((c) =>
+                              DropdownMenuItem(value: c, child: Text(c)))
+                          .toList(),
+                      onChanged: (newVal) {
+                        setState(() {
+                          categoryMap[key] = newVal;
+                        });
+                        FirebaseFirestore.instance
+                            .collection("subjects")
+                            .doc(grade.toString())
+                            .collection(subject)
+                            .doc("meta")
+                            .set({
+                          "category": newVal,
+                          "isOriginal": isOriginal,
+                        }, SetOptions(merge: true));
+                      },
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text("원반수업", style: TextStyle(fontSize: 11)),
+                        Switch(
+                          value: isOriginal,
+                          onChanged: (val) {
+                            setState(() {
+                              isOriginalMap[key] = val;
+                            });
+                            FirebaseFirestore.instance
+                                .collection("subjects")
+                                .doc(grade.toString())
+                                .collection(subject)
+                                .doc("meta")
+                                .set({
+                              "category": category,
+                              "isOriginal": val,
+                            }, SetOptions(merge: true));
+                          },
+                        ),
+                      ],
+                    )
+                  ],
                 ),
-              ]),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text("원반수업", style: TextStyle(fontSize: 12)),
-                  Switch(
-                    value: isOriginal,
-                    onChanged: (val) {
-                      setState(() {
-                        isOriginalMap[subject] = val;
-                      });
-                      FirebaseFirestore.instance
-                          .collection("subjects")
-                          .doc(subject)
-                          .set({
-                        "category": category,
-                        "isOriginal": val,
-                        "grade": grade,
-                      }, SetOptions(merge: true));
-                    },
-                  ),
-                ],
-              )
-            ],
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget buildSubjectGrid(List<String> subjects, int grade) {
+    return GridView.count(
+      crossAxisCount: 2,
+      childAspectRatio: 3.8,
+      padding: const EdgeInsets.all(10),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      children: subjects.map((s) => buildSubjectItem(s, grade)).toList(),
     );
   }
 
@@ -189,17 +218,17 @@ class _SubjectCategoryDashboardState extends State<SubjectCategoryDashboard> {
         children: [
           const Padding(
             padding: EdgeInsets.all(10),
-            child: Text("2학년 과목",
+            child: Text("✅ 2학년 과목",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
-          ...grade2Subjects.map((s) => buildSubjectItem(s, 2)).toList(),
+          buildSubjectGrid(grade2Subjects, 2),
           const Divider(thickness: 2),
           const Padding(
             padding: EdgeInsets.all(10),
-            child: Text("3학년 과목",
+            child: Text("✅ 3학년 과목",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
-          ...grade3Subjects.map((s) => buildSubjectItem(s, 3)).toList(),
+          buildSubjectGrid(grade3Subjects, 3),
         ],
       ),
     );
