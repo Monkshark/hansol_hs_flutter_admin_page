@@ -2,11 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-class niesApiKeys {
-  static const NIES_API_KEY = 'db3161d360da4d07b650348a167d4411';
-  static const ATPT_OFCDC_SC_CODE = 'I10';
-  static const SD_SCHUL_CODE = '9300058';
-}
+import 'neis_api_keys.dart';
 
 class TimetableDataApi {
   static Future<List<String>> getSubjects({required int grade}) async {
